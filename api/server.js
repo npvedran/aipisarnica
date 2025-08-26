@@ -1,23 +1,20 @@
 const express = require("express");
+const em = require("./routes/emails.js");
+const { mySql } = require("./config.js");
+
 const app = express();
 
 const cors = require("cors");
 app.use(cors());
 
 global.mysql = require("mysql")
-global.con = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "***",
-  database: "repo"
-});
+global.con = mysql.createConnection(mySql);
 
 const { json } = require("body-parser");
 
 const testroute = require("./routes/testroute.js");
 app.use(testroute);
 
-const em = require("./routes/emails.js");
 app.use(em);
 
 app.get(/(.*)/, (req, res) => {
