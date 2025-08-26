@@ -1,0 +1,11 @@
+[
+    {
+        "user": "vedran@net-projekt.hr",
+        "password": "****",
+        "host": "net-projekt.hr",
+        "port": 110,
+        "tls": false,
+        "authTimeout": 10000,
+        "timeoffset": 2
+    }
+]
