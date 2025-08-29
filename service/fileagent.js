@@ -2,6 +2,8 @@ import * as fs from "fs";
 import pdfParse from "pdf-parse";
 import { summarize } from "./aiengine.js";
 
+/***********************************************************/
+
 export async function processPDF(filePath, account) {
   const fileBuffer = fs.readFileSync(filePath);
   const created=fs.

@@ -10,34 +10,6 @@ export const getUUID = () => {
   return id;
 };
 
-export const sqlDate = (date) => {
-  var day = ("0" + date.getDate()).slice(-2);
-  var month = ("0" + (date.getMonth() + 1)).slice(-2);
-  var today = date.getFullYear() + "-" + month + "-" + day;
-  let timestamp = `${today} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
-  return timestamp;
-};
-
-export const getQuery = async (sql) => {
-  return new Promise((resolve, reject) => {
-    con.query(sql, (err, result) => {
-      if (err) {
-        console.log(err.message);
-        reject(err);
-      } else {
-        resolve(result);
-      }
-    });
-  });
-};
-
-export const getProperDateTimeForMySQL = (timestamp, offset) => {
-  let dt = new Date(timestamp);
-  if (!offset) offset = 2;
-  let res = new Date(dt.setHours(dt.getHours() + offset)).toISOString();
-  return res;
-};
-
 export const readFile = (filePath) => {
   const data = fs.readFileSync(path.join(__dirname, `.`, filePath));
   return data;

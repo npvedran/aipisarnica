@@ -1,6 +1,14 @@
 import { apiURL } from "./config.js";
 import chalk from "chalk";
 
+const args = process.argv.slice(2);
+if (args.length == 0) {
+  console.log(
+    chalk.red("You must specify the account as the first parameter...")
+  );
+  process.exit(0);
+}
+
 const getDocs = async (account) => {
   return fetch(`${apiURL}/docs/${account}`, {
     method: "GET",
@@ -25,7 +33,7 @@ const postData = async (url, postData, token) => {
     });
 };
 
-await getDocs("vedran@net-projekt.hr").then((data) => {
+await getDocs(args[0]).then((data) => {
   if (data.length == 0) {
     console.log(chalk.red("No documents found"));
     return;

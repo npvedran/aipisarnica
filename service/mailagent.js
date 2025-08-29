@@ -4,26 +4,23 @@ import { convert } from "html-to-text";
 import mailAccounts from "./mailaccounts.json" with { type: "json" };
 import { summarize } from "./aiengine.js";
 import {
-  getProperDateTimeForMySQL,
-  getQuery,
-  sqlDate,
-  getUUID,
   readData,
   writeData,
   fileExists,
 } from "./utils.js";
+import { createDocRecordFromEmailRecord, createEmailRecord, getUnprocessedEmailRecords, saveLatestEmailInfo } from "./dbengine.js";
 
 //let oldmail = [{ msgNum: 441, uid: "UID740-1747990756", size: 101245 }]; // from database
 
 /***********************************************************/
 
-export const analyzeMail = async () => {
+export const analyzeEmail = async () => {
   for (const account of mailAccounts) {
     console.log("\n");
     console.log(`Mail account: ${account.user}`);
-    let m = await getNewMail(account);
+    let m = await downloadEmails(account);
     console.log(`New emails: ${m.length}`);
-    await processMail(account);
+    await processEmail(account);
     console.log(`Done with ${account.user}.\n`);
   }
   console.log(`Done all...`);
@@ -31,10 +28,8 @@ export const analyzeMail = async () => {
 
 /***********************************************************/
 
-export const processMail = async (account) => {
-  let emails = await getQuery(
-    `SELECT * FROM emails WHERE processed IS NULL OR processed<>1 ORDER BY created`
-  );
+export const processEmail = async (account) => {
+  let emails = await getUnprocessedEmailRecords(account);
   console.log(`Unprocessed emails: ${emails.length}`);
   if (emails.length > 0) console.log("Processing emails...");
   for (const email of emails) {
@@ -46,47 +41,15 @@ export const processMail = async (account) => {
       console.log(`Attachments: ${email.nAttachments}`);
     console.log("\n");
 
-    let doc = await getQuery(
-      `SELECT * FROM docs WHERE idref="${email.idemail}"`
-    );
-    if (doc.length == 0) {
-      await getQuery(
-        `INSERT INTO docs (iddoc, idref, source, account, title, content, attachments, origin, destination, created, processed) 
-        VALUES 
-        ("${getUUID()}", "${email.idemail}", 'M', "${account.user}", "${
-          email.subject
-        }", "${content}", "${email.attachments}", "${email.origin}", "${
-          email.destination
-        }", "${sqlDate(new Date(email.created))}", "${sqlDate(new Date())}");`
-      );
-      await getQuery(
-        `UPDATE emails SET processed=1 WHERE idemail="${email.idemail}"`
-      );
-    } else {
-      await getQuery(
-        `UPDATE docs SET title="${
-          email.subject
-        }", content="${content}", attachments="${email.attachments}", origin="${
-          email.origin
-        }", destination="${email.destination}", processed="${sqlDate(
-          new Date()
-        )}"
-        WHERE idref="${email.idemail}";`
-      );
-      await getQuery(
-        `UPDATE emails SET processed=1 WHERE idemail="${email.idemail}"`
-      );
-    }
+    createDocRecordFromEmailRecord(email);
   }
 };
 
 /***********************************************************/
 
-export const storeMails = async (account, mails) => {
+export const saveEmails = async (account, mails) => {
   if (mails && mails.length > 0) {
     for (const m of mails) {
-      var timestamp = sqlDate(new Date());
-      let created = sqlDate(new Date(m.date));
 
       let subject = m.subject
         .replace(/"/g, "'")
@@ -109,14 +72,12 @@ export const storeMails = async (account, mails) => {
       });
       attachments = attachments.filter((a) => a !== false).join(",");
 
-      await getQuery(
-        `INSERT INTO emails (idemail, account, subject, body, attachments, origin, destination, created, timestamp, msgnum, uuid, size, processed) 
-        VALUES 
-        ("${getUUID()}","${
-          account.user
-        }", "${subject}", "${body}", "${attachments}", "${m.from}", "${
-          m.to
-        }", "${created}", "${timestamp}", ${m.msgNum}, "${m.uuid}", ${m.size})`, 0
+      await createEmailRecord(
+        account.user,
+        subject,
+        body,
+        attachments,
+        m
       );
     }
   }
@@ -124,49 +85,10 @@ export const storeMails = async (account, mails) => {
 
 /***********************************************************/
 
-export const storeLatestMail = async (account, mail) => {
-  let d = await getQuery(
-    `SELECT * FROM latestmail where account="${account.user}"`
-  );
-  if (d.length == 0) {
-    await getQuery(
-      `INSERT INTO latestmail (idlast, account, lastget) 
-        VALUES 
-        ("${getUUID()}", "${account.user}", "${sqlDate(new Date())}")`
-    );
-  } else {
-    await getQuery(
-      `UPDATE latestmail SET lastget="${sqlDate(new Date())}" WHERE account="${
-        account.user
-      }"`
-    );
-  }
-};
-
-/***********************************************************/
-
-export const storeLatestProcess = async (account) => {
-  await getQuery(
-    `UPDATE latestmail SET lastprocess="${sqlDate(
-      new Date()
-    )}" WHERE account="${account.user}"`
-  );
-};
-
-/***********************************************************/
-
-export const getLatestMail = async (account) => {
-  return await getQuery(
-    `SELECT * FROM latestmail where account="${account.user}"`
-  );
-};
-
-/***********************************************************/
-
-export const getNewMail = async (account) => {
+export const downloadEmails = async (account) => {
   let newEmails = new Array();
   let pop3 = new Pop3Command(account);
-  let newEmailIDs = await getNewMailIDs(pop3);
+  let newEmailIDs = await downloadEmailsIDs(pop3);
   if (newEmailIDs.length > 0) {
     let n = await readMailMessages(pop3, newEmailIDs);
     newEmails = newEmails.concat(n);
@@ -174,15 +96,15 @@ export const getNewMail = async (account) => {
   await pop3.QUIT();
   if (newEmailIDs.length > 0) {
     let latest = newEmailIDs[0];
-    await storeLatestMail(account, latest);
-    await storeMails(account, newEmails);
+    await saveLatestEmailInfo(account, latest);
+    await saveEmails(account, newEmails);
   }
   return newEmails;
 };
 
 /***********************************************************/
 
-export const getNewMailIDs = async (pop3) => {
+export const downloadEmailsIDs = async (pop3) => {
   const list = await pop3.LIST();
   const uidl = await pop3.UIDL();
   const uidlFile = `./data/uidl_${pop3.user}.json`;
