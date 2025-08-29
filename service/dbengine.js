@@ -1,6 +1,5 @@
 import { dbConnectionDetails } from "./config.js";
 import mysql from "mysql";
-import { getQuery, sqlDate } from "./utils.js";
 
 global.con = mysql.createConnection(dbConnectionDetails);
 
