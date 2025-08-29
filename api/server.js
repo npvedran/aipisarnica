@@ -1,14 +1,14 @@
 const express = require("express");
 const em = require("./routes/emails.js");
-const { mySql } = require("./config.js");
+const { dbConnectionDetails } = require("./config.js");
 
 const app = express();
 
 const cors = require("cors");
 app.use(cors());
 
-global.mysql = require("mysql")
-global.con = mysql.createConnection(mySql);
+global.mysql = require("mysql");
+global.con = mysql.createConnection(dbConnectionDetails);
 
 const { json } = require("body-parser");
 
